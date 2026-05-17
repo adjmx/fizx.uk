@@ -148,9 +148,11 @@
       window.history.replaceState({}, '', window.location.pathname);
     const timerId = setInterval(() => { tick = tick < SQUARE_COUNT ? tick + 1 : 0; }, 1000);
     checkRelay();
+    openSamplesFeed();
     return () => {
       clearInterval(timerId);
       if (retryTimer) clearTimeout(retryTimer);
+      if (samplesWs) samplesWs.close();
     };
   });
 
@@ -254,6 +256,98 @@
       </svg>`,
     },
   ];
+
+  // ── Recent samples feed (smpl kind:1063 from relay.fizx.uk) ─────────────────
+  interface Sample {
+    id: string;
+    pubkey: string;
+    created_at: number;
+    url: string;
+    title: string;
+    mime?: string;
+    tagged?: string[];
+  }
+  const AUDIO_MIME_RE = /^audio\//i;
+  const AUDIO_EXT_RE  = /\.(mp3|ogg|wav|flac|m4a|aac|opus|weba)(\?.*)?$/i;
+
+  let samples: Sample[] = [];
+  let samplesWs: WebSocket | null = null;
+  let playingId: string | null = null;
+  let audioEl: HTMLAudioElement;
+
+  // Priority: own > mentions > public; then chronological desc. Cap at 8 rows.
+  $: visibleSamples = (() => {
+    const me = pubkey;
+    const scored = samples.map(s => {
+      const own = me && s.pubkey === me ? 0 : null;
+      const ment = me && !own && s.tagged?.includes(me) ? 1 : null;
+      const priority = own !== null ? own : ment !== null ? ment : 2;
+      return { ...s, priority };
+    });
+    return scored
+      .sort((a, b) => a.priority - b.priority || b.created_at - a.created_at)
+      .slice(0, 8);
+  })();
+
+  function relTime(t: number): string {
+    const diff = Date.now() / 1000 - t;
+    if (diff < 60)     return 'just now';
+    if (diff < 3600)   return `${Math.floor(diff / 60)}m`;
+    if (diff < 86400)  return `${Math.floor(diff / 3600)}h`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d`;
+    return new Date(t * 1000).toLocaleDateString();
+  }
+
+  function togglePlay(s: Sample) {
+    if (!audioEl) return;
+    if (playingId === s.id) {
+      audioEl.pause();
+      playingId = null;
+      return;
+    }
+    audioEl.src = s.url;
+    audioEl.play()
+      .then(() => { playingId = s.id; })
+      .catch(() => { playingId = null; });
+  }
+
+  function openSamplesFeed() {
+    if (typeof window === 'undefined') return;
+    try { samplesWs = new WebSocket('wss://relay.fizx.uk'); } catch { return; }
+    const since = Math.floor(Date.now() / 1000) - 86400 * 30;
+    samplesWs.onopen = () => {
+      samplesWs!.send(JSON.stringify(['REQ', 's-pub', { kinds: [1063], limit: 60, since }]));
+      if (pubkey) {
+        samplesWs!.send(JSON.stringify(['REQ', 's-mine',    { kinds: [1063], authors: [pubkey], limit: 30 }]));
+        samplesWs!.send(JSON.stringify(['REQ', 's-mentions',{ kinds: [1063], '#p': [pubkey],    limit: 30 }]));
+      }
+    };
+    samplesWs.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data as string);
+        if (msg[0] !== 'EVENT') return;
+        const e = msg[2] as { id: string; pubkey: string; created_at: number; tags: string[][]; content: string };
+        const urlTag = e.tags.find(t => t[0] === 'url');
+        const mTag   = e.tags.find(t => t[0] === 'm');
+        const altTag = e.tags.find(t => t[0] === 'alt') ?? e.tags.find(t => t[0] === 'title');
+        const url  = urlTag?.[1] ?? '';
+        const mime = mTag?.[1] ?? '';
+        if (!url) return;
+        if (mime && !AUDIO_MIME_RE.test(mime)) return;
+        if (!mime && !AUDIO_EXT_RE.test(url))  return;
+        const title = altTag?.[1] ?? e.content?.trim() ?? url.split('/').pop() ?? 'untitled';
+        const taggedHexes = e.tags
+          .filter(t => t[0] === 'p' && /^[0-9a-f]{64}$/i.test(t[1] || ''))
+          .map(t => t[1].toLowerCase());
+        const sample: Sample = {
+          id: e.id, pubkey: e.pubkey, created_at: e.created_at, url, title, mime,
+          tagged: taggedHexes.length > 0 ? taggedHexes : undefined,
+        };
+        if (samples.find(s => s.id === sample.id)) return;
+        samples = [...samples, sample];
+      } catch {}
+    };
+  }
 </script>
 
 <svelte:head>
@@ -279,6 +373,9 @@
              class="text-[#6b7a8d] hover:text-[#34d399] transition-colors whitespace-nowrap">{label}</a>
         {/each}
       </div>
+      <a href="https://github.com/adjmx/fizx.uk" target="_blank" rel="noopener noreferrer" title="Source on GitHub" aria-label="Source on GitHub" class="shrink-0 text-[#6b7a8d]/60 hover:text-[#34d399] transition-colors">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.69-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.71.08-.71 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18.92-.26 1.91-.39 2.89-.39.98 0 1.97.13 2.89.39 2.21-1.49 3.18-1.18 3.18-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.69 5.41-5.25 5.69.41.36.77 1.07.77 2.16 0 1.56-.01 2.82-.01 3.21 0 .31.21.68.8.56 4.56-1.52 7.85-5.83 7.85-10.91C23.5 5.65 18.35.5 12 .5z"/></svg>
+      </a>
       <div class="shrink-0 flex justify-end w-[34px] sm:w-[160px]">
         {#if pubkey}
           <button on:click={logout} class="font-mono text-[11px] px-2 py-1 border border-[#34d399]/30 text-[#34d399]/70 hover:text-[#34d399] hover:border-[#34d399]/60 transition-colors flex items-center gap-1.5 w-full justify-center whitespace-nowrap">
@@ -495,6 +592,45 @@
           </a>
         {/each}
       </div>
+    </section>
+
+    <!-- Recent smpl samples (live feed from relay.fizx.uk) -->
+    <section class="mb-14">
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="text-[10px] font-mono uppercase tracking-widest text-[#6b7a8d]">recent samples</h2>
+        <a href="https://smpl.fizx.uk" class="text-[10px] font-mono text-[#6b7a8d]/60 hover:text-[#34d399] transition-colors">smpl.fizx.uk →</a>
+      </div>
+      {#if visibleSamples.length === 0}
+        <p class="text-[11px] font-mono text-[#6b7a8d]/50 px-3 py-4 border border-[#1e2d3d] bg-[#131d2a]/40">
+          No samples yet — be the first to <a href="https://smpl.fizx.uk" class="text-[#34d399] hover:underline">publish one</a>.
+        </p>
+      {:else}
+        <div class="border border-[#1e2d3d] bg-[#131d2a]/40 divide-y divide-[#1e2d3d]">
+          {#each visibleSamples as s (s.id)}
+            <div class="flex items-center gap-3 px-3 py-2">
+              <button on:click={() => togglePlay(s)} aria-label={playingId === s.id ? 'pause' : 'play'}
+                class="shrink-0 w-7 h-7 rounded-full border border-[#1e2d3d] hover:border-[#34d399] text-[#6b7a8d] hover:text-[#34d399] transition-colors flex items-center justify-center">
+                {#if playingId === s.id}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                {:else}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                {/if}
+              </button>
+              <a href={`https://smpl.fizx.uk`} target="_blank" rel="noopener noreferrer" class="flex-1 min-w-0 font-mono text-[12px] text-[#e6edf3] hover:text-[#34d399] transition-colors truncate" title={s.title}>{s.title}</a>
+              {#if s.priority === 0}
+                <span class="shrink-0 text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border border-[#34d399]/40 text-[#34d399]/80">you</span>
+              {:else if s.priority === 1}
+                <span class="shrink-0 text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 border border-[#a78bfa]/40 text-[#a78bfa]/80">mention</span>
+              {/if}
+              {#if s.tagged && s.tagged.length > 0}
+                <span class="shrink-0 text-[10px] font-mono text-[#a78bfa]/60" title={`${s.tagged.length} tagged`}>·{s.tagged.length}</span>
+              {/if}
+              <span class="shrink-0 text-[10px] font-mono text-[#6b7a8d]/50 tabular-nums w-12 text-right">{relTime(s.created_at)}</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      <audio bind:this={audioEl} on:ended={() => playingId = null} on:error={() => playingId = null} preload="none" crossorigin="anonymous"></audio>
     </section>
 
     <!-- Vibe Docs grid -->
