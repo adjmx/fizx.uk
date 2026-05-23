@@ -435,7 +435,7 @@
     <!-- Hero card — grid layout matching glmps.fizx.uk:
          each cell is its own padded column separated by a vertical divider.
          On narrow widths the cells stack with horizontal dividers (divide-y). -->
-    <div class="bg-[#131d2a] border border-[#1e2d3d] mb-10 min-h-[110px] grid grid-cols-1 sm:grid-cols-[auto_1fr] divide-y sm:divide-y-0 sm:divide-x divide-[#1e2d3d]">
+    <div class="bg-[#131d2a] border border-[#1e2d3d] mb-10 min-h-[110px] grid grid-cols-1 sm:grid-cols-[auto_1fr_1fr] divide-y sm:divide-y-0 sm:divide-x divide-[#1e2d3d]">
 
       <!-- Title cell -->
       <div class="px-4 py-3 min-w-0 flex items-start">
@@ -527,6 +527,11 @@
         {/if}
 
       </div>
+
+      <!-- Empty trailing cell — caps the RELAY column at ~50% of the post-title width.
+           Hidden on mobile (which uses grid-cols-1 stack); on sm+ it renders so the
+           divide-x stroke bounds RELAY's right edge. -->
+      <div class="hidden sm:block"></div>
 
     </div>
     <!-- /hero card -->
