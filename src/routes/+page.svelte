@@ -432,56 +432,69 @@
   <!-- Main -->
   <main class="flex-1 max-w-5xl mx-auto w-full px-6 py-10">
 
-    <!-- Hero card: full-width bg-card border, title (left) · relay status (middle) · Shaka (right).
-         Mirrors the React subdomains' hero card pattern. On narrow widths the
-         children wrap (flex-wrap). -->
-    <div class="bg-[#131d2a] border border-[#1e2d3d] px-4 py-3 mb-10 min-h-[110px] flex flex-wrap items-start gap-4">
-      <h1 class="font-bold tracking-tight shrink-0" style="font-size: clamp(28px, 5vw, 40px)">
-        {#each ALL_CHARS as { ch, isAccent }, i (i)}
-          <span
-            class="inline-block"
-            style={isAccent ? 'background: linear-gradient(to right,#60a5fa,#4ade80); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;' : 'color: rgba(74,222,128,0.2);'}
-            in:fly={isAccent ? { x: -80, duration: LETTER_DURATION, delay: Math.round(i * LETTER_STAGGER), easing: cubicOut } : { x: 0, duration: 600, delay: Math.round(i * LETTER_STAGGER), easing: cubicOut }}
-          >{ch}</span>
-        {/each}
-      </h1>
+    <!-- Hero card — grid layout matching glmps.fizx.uk:
+         each cell is its own padded column separated by a vertical divider.
+         On narrow widths the cells stack with horizontal dividers (divide-y). -->
+    <div class="bg-[#131d2a] border border-[#1e2d3d] mb-10 min-h-[110px] grid grid-cols-1 sm:grid-cols-[auto_1fr] divide-y sm:divide-y-0 sm:divide-x divide-[#1e2d3d]">
 
-      <!-- Relay status text — flex-1, sits between the title and the Shaka inside the hero card -->
-      <div class="flex-1 min-w-0 space-y-0.5 font-mono text-[10px] sm:text-[11px] group">
+      <!-- Title cell -->
+      <div class="px-4 py-3 min-w-0 flex items-start">
+        <h1 class="font-bold tracking-tight" style="font-size: clamp(28px, 5vw, 40px)">
+          {#each ALL_CHARS as { ch, isAccent }, i (i)}
+            <span
+              class="inline-block"
+              style={isAccent ? 'background: linear-gradient(to right,#60a5fa,#4ade80); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;' : 'color: rgba(74,222,128,0.2);'}
+              in:fly={isAccent ? { x: -80, duration: LETTER_DURATION, delay: Math.round(i * LETTER_STAGGER), easing: cubicOut } : { x: 0, duration: 600, delay: Math.round(i * LETTER_STAGGER), easing: cubicOut }}
+            >{ch}</span>
+          {/each}
+        </h1>
+      </div>
 
-        <!-- Line 1: status · name · version · latency · checked · refresh -->
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <a href="https://relay.fizx.uk" class="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity">
-            {#if relayOnline === null}
-              <span class="w-1.5 h-1.5 rounded-full bg-[#a78bfa] animate-pulse shrink-0"></span>
-            {:else if relayOnline}
-              <span class="w-1.5 h-1.5 rounded-full bg-[#34d399] shrink-0" style="box-shadow:0 0 4px rgba(52,211,153,.5)"></span>
-            {:else}
-              <span class="w-1.5 h-1.5 rounded-full bg-[#f87171] shrink-0"></span>
-            {/if}
-            <span class="font-bold text-[#34d399]">relay<span class="text-[#6b7a8d]">.fizx.uk</span></span>
-          </a>
+      <!-- Relay cell — mirrors glmps's `relays` column treatment:
+           tracking-widest label, then a bordered pill carrying status dot · domain · version · GRASP · latency,
+           then a muted metadata sub-row, then the NIPs/Kinds chip listing. -->
+      <div class="px-4 py-3 flex flex-col gap-1.5 font-mono min-w-0 group">
+
+        <div class="text-[10px] uppercase tracking-widest text-[#6b7a8d]/60">relay</div>
+
+        <!-- Pill (glmps RelayStats style) -->
+        <a href="https://relay.fizx.uk"
+           class="flex items-center gap-1.5 text-[11px] px-2 py-1 border border-[#1e2d3d] bg-[#0d1117]/40 hover:border-[#34d399]/40 transition-colors"
+           title="relay.fizx.uk">
+          {#if relayOnline === null}
+            <span class="w-1.5 h-1.5 rounded-full bg-[#a78bfa] animate-pulse shrink-0"></span>
+          {:else if relayOnline}
+            <span class="w-1.5 h-1.5 rounded-full bg-[#34d399] shrink-0" style="box-shadow:0 0 4px rgba(52,211,153,.5)"></span>
+          {:else}
+            <span class="w-1.5 h-1.5 rounded-full bg-[#f87171] shrink-0"></span>
+          {/if}
+          <span class="font-mono text-[#e6edf3]/90 flex-1 truncate">relay.fizx.uk</span>
           {#if nip11Status === 'ok' && relayInfo?.version}
-            <span class="text-[#6b7a8d]">v{relayInfo.version}</span>
-          {:else if nip11Status === 'loading'}
-            <span class="text-[#6b7a8d] animate-pulse">querying…</span>
-          {:else if nip11Status !== 'ok'}
-            <span class="text-[#f87171]/60">NIP-11 unavailable</span>
+            <span class="font-mono text-[9px] px-1 border border-[#6b7a8d]/40 text-[#6b7a8d]/80 shrink-0">v{relayInfo.version}</span>
+          {/if}
+          {#if isGrasp}
+            <span class="font-mono text-[9px] px-1 border border-[#a78bfa] text-[#a78bfa] tracking-widest font-bold shrink-0" title="NIP-34 git events accepted">GRASP</span>
           {/if}
           {#if wsLatency !== null}
-            <span class="text-[#34d399]/60">{wsLatency}ms</span>
+            <span class="font-mono text-[#34d399]/70 tabular-nums shrink-0">{wsLatency}ms</span>
+          {/if}
+        </a>
+
+        <!-- Metadata sub-row -->
+        <div class="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px]">
+          {#if nip11Status === 'loading'}
+            <span class="text-[#6b7a8d]/70 animate-pulse">querying…</span>
+          {:else if nip11Status !== 'ok'}
+            <span class="text-[#f87171]/60">NIP-11 unavailable</span>
           {/if}
           {#if wsStatus === 'offline'}
             <span class="text-[#f87171]/60">offline</span>
           {/if}
-          {#if isGrasp}
-            <span class="text-[10px] font-bold tracking-widest px-1 text-[#a78bfa] border border-[#a78bfa]/60" title="NIP-34 git events accepted">GRASP</span>
-          {/if}
           {#if lastChecked}
-            <span class="text-[9px] text-[#6b7a8d]/40">{lastChecked}</span>
+            <span class="text-[#6b7a8d]/60 tabular-nums">checked {lastChecked}</span>
           {/if}
           <button on:click|preventDefault={checkRelay}
-            class="text-[#6b7a8d]/60 hover:text-[#34d399] transition-colors"
+            class="text-[#6b7a8d]/60 hover:text-[#34d399] transition-colors ml-auto"
             title="Refresh relay status">
             {#if wsStatus === 'checking'}
               <span class="w-1.5 h-1.5 rounded-full bg-[#a78bfa] animate-pulse inline-block"></span>
@@ -491,10 +504,10 @@
           </button>
         </div>
 
-        <!-- Line 2: NIPs · Kinds (numbers only, separator-dotted, flex-wraps if room is tight) -->
+        <!-- NIPs · Kinds chip listing -->
         {#if relayInfo && Array.isArray(relayInfo.supported_nips) && relayInfo.supported_nips.length}
           {@const acceptedKinds = KIND_MAP.filter(k => supportedNips.includes(k.nip))}
-          <div class="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 text-[10px] leading-tight mt-0.5">
+          <div class="flex flex-wrap items-baseline gap-x-1 gap-y-0.5 text-[10px] leading-tight">
             <span class="text-[#a78bfa]/70 font-bold uppercase tracking-widest text-[9px] mr-0.5">NIPs</span>
             {#each (relayInfo.supported_nips as number[]).slice().sort((a,b)=>a-b) as nip, i}
               {#if i > 0}<span class="text-[#6b7a8d]/30">·</span>{/if}
@@ -513,8 +526,7 @@
           </div>
         {/if}
 
-        </div>
-        <!-- /flex-1 text content -->
+      </div>
 
     </div>
     <!-- /hero card -->
