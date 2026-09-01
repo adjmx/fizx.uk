@@ -197,21 +197,13 @@
     },
   ];
 
-  // Footer-only inline link chips (ln + recipes + relay).
+  // Footer-only inline link chips (ln + relay).
   const footerLinks = [
     {
       href: 'https://ln.fizx.uk',
       label: 'ln',
       icon: `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="#a78bfa">
         <path d="M13 2L4.5 13.5H11L10 22L20.5 10.5H14L13 2z"/>
-      </svg>`,
-    },
-    {
-      href: 'https://recipes.fizx.uk',
-      label: 'recipes',
-      icon: `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
       </svg>`,
     },
     {
@@ -614,7 +606,10 @@
     </section>
 
     <!-- Vibe Docs grid — REMOVED 2026-05-17.
-         folio + scripts deleted; ln + recipes moved to footer chips. -->
+         folio + scripts deleted; ln + recipes moved to footer chips.
+         The recipes chip was itself removed 2026-09-01: recipes.fizx.uk was
+         never built — no DNS, vhost or webroot — so it linked nowhere from
+         every page of both sites for three and a half months. -->
 
 
     <!-- Identity section ('Find me on' + GitHub/Nostr/relay cards) — REMOVED 2026-05-17.
