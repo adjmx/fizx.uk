@@ -31,4 +31,4 @@ npm run build   # → build/
 rsync -avz --delete -e "ssh -p 2121" build/ root@88.218.206.187:/var/www/fizx.uk/
 ```
 
-VPS: `88.218.206.187`. Full server / nginx / SSL / DNS notes for the wider deployment live in the local `code_vibe/CLAUDE.md` (not pushed; this README is the public-facing summary).
+VPS: `88.218.206.187`. Full server / nginx / SSL / DNS notes for the wider deployment live in the local `code_gh/adjmx/CLAUDE.md` (not pushed; this README is the public-facing summary).
