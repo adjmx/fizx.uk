@@ -2,9 +2,8 @@
 # deploy.sh - Deploy fizx.uk to your server
 set -e
 
-SERVER="root@88.218.206.187"
+SERVER="fizx.uk"   # a Host alias in ~/.ssh/config: the user, port and key live there
 REMOTE_PATH="/var/www/fizx.uk"
-SSH_PORT="2121"
 LOCAL_DIST="./build"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
@@ -20,16 +19,11 @@ npm run build
 echo "✅ Build done"
 
 echo "🚀 Deploying..."
-rsync -avz --delete -e "ssh -p $SSH_PORT" \
+rsync -avz --delete \
   --exclude='.DS_Store' --exclude='*.log' --exclude='.git' \
   "$LOCAL_DIST/" "$SERVER:$REMOTE_PATH/"
 
-ssh -p "$SSH_PORT" "$SERVER" "
-  chown -R www-data:www-data $REMOTE_PATH
-  CONF=\$(ls /etc/nginx/sites-enabled/fizx.uk 2>/dev/null | head -1)
-  if [ -n \"\$CONF\" ]; then
-    sudo sed -i 's|try_files \$uri \$uri/ =404;|try_files \$uri \$uri/ /404.html;|g' \"\$CONF\"
-    sudo nginx -t && sudo systemctl reload nginx && echo 'Nginx reloaded'
-  fi
-"
+# Nothing runs on the server after the copy. Root login is off there and sudo
+# asks for a password; the webroot belongs to the deploy user, and the vhost
+# already serves /404.html for unknown paths (this script used to patch that).
 echo "✅ https://fizx.uk"
